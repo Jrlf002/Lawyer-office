@@ -1,0 +1,12 @@
+{
+  "name": "bufete-juridico-fonseca",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sitio y panel privado para Bufete Jurídico Fonseca",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
