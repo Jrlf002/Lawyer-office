@@ -1,0 +1,55 @@
+{
+  "admin": {
+    "id": "b5e00faa-b8e8-4eed-9f86-5783e0811b00",
+    "name": "Natalia Fonseca",
+    "email": "natalialasteniafonsecagonzalez@gmail.com",
+    "phone": "+50589705229",
+    "salt": "adf3d283334a09b2fc05adcf40c80c6d",
+    "passwordHash": "96e234fbdec0a4bd666ef29b397a56d478dd97972b5c0094b2defefc0bb5e2c5bedb7224c4636a2476306c61b3eeef33ff7a10f0f728a55d12a0f74e152548b3"
+  },
+  "collaborators": [
+    {
+      "id": "ca840066-70ff-40fe-9b54-d977a4758f1c",
+      "name": "Raúl Fonseca",
+      "email": "jrlf002@gmail.com",
+      "phone": "+50581934695",
+      "salt": "d022e67be6543dbfd35825ff55c296b3",
+      "passwordHash": "b6517b334cf680ac5a7e544c50c7b71b36909ba9542d43e8fd0ee915c153dffc4984264c8deb3c2f5b801abb587823c275a11f1f58d102a1152a50d9950f8bba",
+      "status": "approved",
+      "createdAt": "2026-11-13T08:49:22.331Z",
+      "reviewedAt": "2026-11-13T08:49:44.897Z",
+      "lastLoginAt": "2026-11-13T09:06:40.987Z"
+    }
+  ],
+  "requests": [],
+  "cases": [
+    {
+      "clientName": "JESSNER VLADIMIR",
+      "cedula": "131313",
+      "phone": "1331",
+      "email": "",
+      "deedReference": "31",
+      "protocolReference": "1313",
+      "protocolBook": "13",
+      "matterType": "general",
+      "deedStatus": "pending",
+      "protocolStatus": "in_progress",
+      "signatureStatus": "pending",
+      "assignedTo": "",
+      "notes": "",
+      "id": "b0b2cc4d-7afd-464b-bc05-81698f567943",
+      "createdAt": "2026-11-13T09:11:00.576Z",
+      "updatedAt": "2026-11-13T09:11:00.576Z",
+      "createdBy": "natalialasteniafonsecagonzalez@gmail.com",
+      "updatedBy": "natalialasteniafonsecagonzalez@gmail.com",
+      "files": []
+    }
+  ],
+  "archives": [],
+  "settings": {
+    "whatsapp": "",
+    "email": "",
+    "extraWhatsapp": [],
+    "extraEmails": []
+  }
+}

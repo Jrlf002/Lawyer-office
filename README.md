@@ -13,9 +13,9 @@ No abra `index.html` directamente: el acceso, las solicitudes y la configuració
 
 ## Expedientes
 
-El dueño crea los expedientes con nombre, cédula, teléfono, referencias de escritura y protocolo, estados de entrega y colaborador asignado. Puede adjuntar archivos PDF, JPG o PNG de hasta 5 MB, clasificados como cédula, escritura o protocolo. Solo el dueño y el colaborador asignado pueden ver esos expedientes y descargar sus adjuntos. El dueño puede asignar o quitar acceso a colaboradores; los colaboradores actualizan los estados y notas de sus expedientes.
+El administrador crea expedientes con referencias de escritura y protocolo, tipo de tramite, estados y colaborador asignado. Todos los usuarios aprobados pueden adjuntar escrituras Word, PDF, JPG o PNG de hasta 5 MB. En Archivo historico se pueden importar carpetas de protocolos anteriores y buscar sus documentos por protocolo, escritura o carpeta. Solo el administrador o colaborador asignado puede editar datos principales y estados.
 
-Los expedientes y adjuntos contienen datos personales. Se guardan en `.bufete-data.json` y `private-files/`; ambos están excluidos del control de versiones mediante `.gitignore`.
+Los expedientes, identificaciones y adjuntos contienen datos personales. Se guardan en `.bufete-data.json` y `private-files/`, excluidos del control de versiones mediante `.gitignore`. Todos los usuarios con cuenta aprobada pueden consultar estos documentos.
 
 ## Colaboradores
 

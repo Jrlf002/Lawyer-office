@@ -32,6 +32,7 @@ function loadData() {
     collaborators: Array.isArray(saved.collaborators) ? saved.collaborators : [],
     requests: Array.isArray(saved.requests) ? saved.requests : [],
     cases: Array.isArray(saved.cases) ? saved.cases : [],
+    archives: Array.isArray(saved.archives) ? saved.archives : [],
     settings: { whatsapp: '', email: '', extraWhatsapp: [], extraEmails: [], ...(saved.settings || {}) }
   };
 }
@@ -90,11 +91,15 @@ function findAccount(email) {
   return collaborator ? { ...collaborator, role: 'collaborator' } : null;
 }
 function publicCollaborator(account) {
-  return { id: account.id, name: account.name, email: account.email, phone: account.phone, status: account.status, createdAt: account.createdAt };
+  return { id: account.id, name: account.name, email: account.email, phone: account.phone, status: account.status, createdAt: account.createdAt, lastLoginAt: account.lastLoginAt || null };
 }
 function publicCase(record) {
-  const { files = [], ...details } = record;
+  const { files = [], email, ...details } = record;
   return { ...details, files: files.map(file => ({ id: file.id, kind: file.kind, name: file.name, createdAt: file.createdAt })) };
+}
+function publicArchive(file) {
+  const { diskPath, ...details } = file;
+  return details;
 }
 async function readJson(req, maxBytes = 256_000) {
   let raw = '';
@@ -125,6 +130,8 @@ function normalizeCase(input) {
     email: String(input.email || '').trim().toLowerCase().slice(0, 160),
     deedReference: String(input.deedReference || '').trim().slice(0, 180),
     protocolReference: String(input.protocolReference || '').trim().slice(0, 180),
+    protocolBook: String(input.protocolBook || '').trim().slice(0, 120),
+    matterType: ['general', 'sale', 'mancomunada', 'company'].includes(input.matterType) ? input.matterType : 'general',
     deedStatus: String(input.deedStatus || 'pending'),
     protocolStatus: String(input.protocolStatus || 'pending'),
     signatureStatus: String(input.signatureStatus || 'pending'),
@@ -253,6 +260,10 @@ const server = http.createServer(async (req, res) => {
         json(res, 403, { error: account.status === 'rejected' ? 'El administrador no aprobó esta solicitud.' : 'Su cuenta sigue pendiente de aprobación del administrador.' });
         return;
       }
+      if (account.role === 'collaborator') {
+        const collaborator = data.collaborators.find(item => item.email === account.email);
+        if (collaborator) { collaborator.lastLoginAt = new Date().toISOString(); persist(); }
+      }
       loginFailures.delete(address);
       makeSession(res, account);
       json(res, 200, { ok: true, role: account.role, name: account.name });
@@ -370,8 +381,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/cases' && req.method === 'GET') {
       if (!requireMember(req, res)) return;
       const session = getSession(req);
-      const visibleCases = session.role === 'owner' ? data.cases : data.cases.filter(item => item.assignedTo === session.email);
-      json(res, 200, visibleCases.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(publicCase));
+      json(res, 200, data.cases.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(item => ({ ...publicCase(item), canEdit: session.role === 'owner' || item.assignedTo === session.email })));
       return;
     }
     if (url.pathname === '/api/cases' && req.method === 'POST') {
@@ -423,10 +433,10 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req, 8_000_000);
       const record = data.cases.find(item => item.id === body.caseId);
       if (!record) { json(res, 404, { error: 'No se encontró el expediente.' }); return; }
-      if (session.role !== 'owner' && record.assignedTo !== session.email) { json(res, 403, { error: 'Este expediente no está asignado a su cuenta.' }); return; }
-      const extensions = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png' };
+      const extensions = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png', 'application/msword': '.doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx' };
       const extension = extensions[body.contentType];
-      if (!extension || !['cedula', 'deed', 'protocol'].includes(body.kind)) { json(res, 400, { error: 'Adjunte un PDF, JPG o PNG y seleccione su categoría.' }); return; }
+      const fileKinds = ['cedula', 'cedula_front', 'cedula_back', 'deed', 'protocol', 'buyer_id_front', 'buyer_id_back', 'seller_id_front', 'seller_id_back', 'circulation_front', 'circulation_back', 'coowner_id_front', 'coowner_id_back', 'company_ruc', 'attorney_id_front', 'attorney_id_back', 'other'];
+      if (!extension || !fileKinds.includes(body.kind)) { json(res, 400, { error: 'Adjunte Word, PDF, JPG o PNG y seleccione una categoría válida.' }); return; }
       const encoded = String(body.data || '');
       if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) { json(res, 400, { error: 'El archivo no tiene un formato válido.' }); return; }
       const bytes = Buffer.from(encoded, 'base64');
@@ -452,7 +462,50 @@ const server = http.createServer(async (req, res) => {
       const record = data.cases.find(item => item.id === url.searchParams.get('caseId'));
       const file = record?.files?.find(item => item.id === url.searchParams.get('fileId'));
       if (!record || !file) { json(res, 404, { error: 'No se encontró el archivo.' }); return; }
-      if (session.role !== 'owner' && record.assignedTo !== session.email) { json(res, 403, { error: 'Este expediente no está asignado a su cuenta.' }); return; }
+      const privateRoot = path.resolve(ROOT, 'private-files') + path.sep;
+      const filePath = path.resolve(ROOT, file.diskPath);
+      if (!filePath.startsWith(privateRoot) || !fs.existsSync(filePath)) { json(res, 404, { error: 'No se encontró el archivo.' }); return; }
+      const safeName = file.name.replace(/["\\\r\n]/g, '_');
+      res.writeHead(200, { 'Content-Type': file.contentType, 'Content-Disposition': `attachment; filename="${safeName}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' });
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+    if (url.pathname === '/api/archive' && req.method === 'GET') {
+      if (!requireMember(req, res)) return;
+      json(res, 200, (data.archives || []).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(publicArchive));
+      return;
+    }
+    if (url.pathname === '/api/archive/files' && req.method === 'POST') {
+      if (!requireMember(req, res)) return;
+      const session = getSession(req);
+      const body = await readJson(req, 8_000_000);
+      const protocolName = String(body.protocolName || '').trim().slice(0, 180);
+      const deedName = String(body.deedName || '').trim().slice(0, 180);
+      const relativePath = String(body.relativePath || '').replace(/[\\]/g, '/').split('/').filter(part => part && part !== '.' && part !== '..').join('/').slice(0, 500);
+      const extensions = { 'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png', 'application/msword': '.doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx' };
+      const extension = extensions[body.contentType];
+      if (!protocolName || !deedName || !extension) { json(res, 400, { error: 'Indique el protocolo y un archivo PDF, Word, JPG o PNG.' }); return; }
+      const encoded = String(body.data || '');
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) { json(res, 400, { error: 'El archivo no tiene un formato válido.' }); return; }
+      const bytes = Buffer.from(encoded, 'base64');
+      if (!bytes.length || bytes.length > 5 * 1024 * 1024) { json(res, 413, { error: 'Cada archivo debe pesar menos de 5 MB.' }); return; }
+      data.archives ||= [];
+      const id = crypto.randomUUID();
+      const safeName = path.basename(String(body.name || deedName)).replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 120) || 'documento';
+      const folder = path.join(ROOT, 'private-files', 'archive');
+      fs.mkdirSync(folder, { recursive: true });
+      const filePath = path.join(folder, `${id}${extension}`);
+      fs.writeFileSync(filePath, bytes, { flag: 'wx', mode: 0o600 });
+      const entry = { id, protocolName, deedName, relativePath, name: safeName, contentType: body.contentType, diskPath: path.relative(ROOT, filePath), createdAt: new Date().toISOString(), uploadedBy: session.email };
+      data.archives.push(entry);
+      persist();
+      json(res, 201, { ok: true, file: publicArchive(entry) });
+      return;
+    }
+    if (url.pathname === '/api/archive/file' && req.method === 'GET') {
+      if (!requireMember(req, res)) return;
+      const file = (data.archives || []).find(item => item.id === url.searchParams.get('id'));
+      if (!file) { json(res, 404, { error: 'No se encontró el archivo.' }); return; }
       const privateRoot = path.resolve(ROOT, 'private-files') + path.sep;
       const filePath = path.resolve(ROOT, file.diskPath);
       if (!filePath.startsWith(privateRoot) || !fs.existsSync(filePath)) { json(res, 404, { error: 'No se encontró el archivo.' }); return; }
